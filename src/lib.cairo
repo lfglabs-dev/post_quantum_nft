@@ -75,7 +75,7 @@ mod QuantumLeapUnoptimized {
     }
 
     #[external(v0)]
-    impl IdentityImpl of super::IQuantumLeap<ContractState> {
+    impl QuantumLeapImpl of super::IQuantumLeap<ContractState> {
         fn mint(ref self: ContractState, id: u256) {
             let caller = get_caller_address();
             assert(!self.blacklisted.read(caller), 'You can only mint once');
