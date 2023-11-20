@@ -77,11 +77,13 @@ mod QuantumLeapUnoptimized {
 
     #[external(v0)]
     impl QuantumLeapImpl of super::IQuantumLeap<ContractState> {
+        // id is specified to save gas on storage and allow for multicalls on mint
         fn mint(ref self: ContractState, id: u256) {
             let caller = get_caller_address();
             assert(!self.blacklisted.read(caller), 'You can only mint once');
             assert(self.opened.read(), 'Mint is closed');
             self.erc721._mint(caller, id);
+            self.blacklisted.write(caller, true);
         }
 
         fn open(ref self: ContractState) {
@@ -93,5 +95,75 @@ mod QuantumLeapUnoptimized {
             self.ownable.assert_only_owner();
             self.opened.write(false);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::option::OptionTrait;
+    use core::traits::TryInto;
+    use starknet::{
+        testing::set_contract_address, class_hash::Felt252TryIntoClassHash, ContractAddress,
+        SyscallResultTrait
+    };
+    use super::{IQuantumLeapDispatcher, IQuantumLeapDispatcherTrait};
+    use super::IQuantumLeap;
+    use super::QuantumLeapUnoptimized;
+
+    fn deploy(calldata: Array<felt252>) -> ContractAddress {
+        let (address, _) = starknet::deploy_syscall(
+            QuantumLeapUnoptimized::TEST_CLASS_HASH.try_into().unwrap(), 0, calldata.span(), false
+        )
+            .unwrap_syscall();
+        address
+    }
+
+    #[test]
+    #[available_gas(2000000000)]
+    fn test_normal_mint() {
+        let admin: ContractAddress = 0x123.try_into().unwrap();
+        let user: ContractAddress = 0x456.try_into().unwrap();
+        set_contract_address(admin);
+        let quantum_leap = IQuantumLeapDispatcher {
+            contract_address: deploy(array![admin.into()])
+        };
+        quantum_leap.open();
+        set_contract_address(user);
+
+        // mint nft with id 1
+        quantum_leap.mint(1);
+    }
+
+    #[test]
+    #[available_gas(2000000000)]
+    #[should_panic(expected: ('Mint is closed', 'ENTRYPOINT_FAILED'))]
+    fn test_closed_mint() {
+        let admin: ContractAddress = 0x123.try_into().unwrap();
+        let user: ContractAddress = 0x456.try_into().unwrap();
+        let quantum_leap = IQuantumLeapDispatcher {
+            contract_address: deploy(array![admin.into()])
+        };
+        set_contract_address(user);
+        // mint nft with id 1
+        quantum_leap.mint(1);
+    }
+
+    #[test]
+    #[available_gas(2000000000)]
+    #[should_panic(expected: ('You can only mint once', 'ENTRYPOINT_FAILED'))]
+    fn test_double_mint() {
+        let admin: ContractAddress = 0x123.try_into().unwrap();
+        let user: ContractAddress = 0x456.try_into().unwrap();
+        set_contract_address(admin);
+        let quantum_leap = IQuantumLeapDispatcher {
+            contract_address: deploy(array![admin.into()])
+        };
+        quantum_leap.open();
+        set_contract_address(user);
+
+        // mint nft with id 1
+        quantum_leap.mint(1);
+        // same with 2 (should fail)
+        quantum_leap.mint(2);
     }
 }
