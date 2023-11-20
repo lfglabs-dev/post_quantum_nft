@@ -1,0 +1,13 @@
+[package]
+name = "quantum_leap_unoptimized"
+authors = ["th0rgal <thomas@starknet.id>"]
+version = "0.1.0"
+
+[dependencies]
+starknet = "2.3.1"
+openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", rev = "f3e2a5f0547a429c716f32471b06df729cbdfb9f" }
+
+[[target.starknet-contract]]
+sierra = true
+casm = true
+casm-add-pythonic-hints = true
