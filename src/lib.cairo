@@ -7,7 +7,8 @@ trait IQuantumLeap<TState> {
 
 #[starknet::contract]
 mod QuantumLeapUnoptimized {
-    use starknet::ContractAddress;
+    use quantum_leap_unoptimized::IQuantumLeap;
+use starknet::ContractAddress;
     use starknet::{get_caller_address, get_contract_address};
     use openzeppelin::{
         account, access::ownable::OwnableComponent,
@@ -79,6 +80,7 @@ mod QuantumLeapUnoptimized {
         fn mint(ref self: ContractState, id: u256) {
             let caller = get_caller_address();
             assert(!self.blacklisted.read(caller), 'You can only mint once');
+            assert(self.opened.read(), 'Mint is closed');
             self.erc721._mint(caller, id);
         }
 
