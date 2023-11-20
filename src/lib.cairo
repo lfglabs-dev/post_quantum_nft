@@ -8,7 +8,7 @@ trait IQuantumLeap<TState> {
 #[starknet::contract]
 mod QuantumLeapUnoptimized {
     use quantum_leap_unoptimized::IQuantumLeap;
-use starknet::ContractAddress;
+    use starknet::ContractAddress;
     use starknet::{get_caller_address, get_contract_address};
     use openzeppelin::{
         account, access::ownable::OwnableComponent,
