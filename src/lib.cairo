@@ -1,13 +1,13 @@
 #[starknet::interface]
-trait IQuantumLeap<TState> {
+trait IPostQuantum<TState> {
     fn mint(ref self: TState, id: u256);
     fn open(ref self: TState);
     fn close(ref self: TState);
 }
 
 #[starknet::contract]
-mod QuantumLeapUnoptimized {
-    use quantum_leap_unoptimized::IQuantumLeap;
+mod PostQuantum {
+    use post_quantum_nft::IPostQuantum;
     use starknet::ContractAddress;
     use starknet::{get_caller_address, get_contract_address};
     use openzeppelin::{
@@ -72,11 +72,11 @@ mod QuantumLeapUnoptimized {
     #[constructor]
     fn constructor(ref self: ContractState, owner: ContractAddress) {
         self.ownable.initializer(owner);
-        self.erc721.initializer('Quantum Leap', 'QL');
+        self.erc721.initializer('Post Quantum', 'PQ');
     }
 
     #[external(v0)]
-    impl QuantumLeapImpl of super::IQuantumLeap<ContractState> {
+    impl PostQuantumImpl of super::IPostQuantum<ContractState> {
         // id is specified to save gas on storage and allow for multicalls on mint
         fn mint(ref self: ContractState, id: u256) {
             let caller = get_caller_address();
@@ -106,13 +106,13 @@ mod tests {
         testing::set_contract_address, class_hash::Felt252TryIntoClassHash, ContractAddress,
         SyscallResultTrait
     };
-    use super::{IQuantumLeapDispatcher, IQuantumLeapDispatcherTrait};
-    use super::IQuantumLeap;
-    use super::QuantumLeapUnoptimized;
+    use super::{IPostQuantumDispatcher, IPostQuantumDispatcherTrait};
+    use super::IPostQuantum;
+    use super::PostQuantum;
 
     fn deploy(calldata: Array<felt252>) -> ContractAddress {
         let (address, _) = starknet::deploy_syscall(
-            QuantumLeapUnoptimized::TEST_CLASS_HASH.try_into().unwrap(), 0, calldata.span(), false
+            PostQuantum::TEST_CLASS_HASH.try_into().unwrap(), 0, calldata.span(), false
         )
             .unwrap_syscall();
         address
@@ -124,14 +124,14 @@ mod tests {
         let admin: ContractAddress = 0x123.try_into().unwrap();
         let user: ContractAddress = 0x456.try_into().unwrap();
         set_contract_address(admin);
-        let quantum_leap = IQuantumLeapDispatcher {
+        let post_quantum = IPostQuantumDispatcher {
             contract_address: deploy(array![admin.into()])
         };
-        quantum_leap.open();
+        post_quantum.open();
         set_contract_address(user);
 
         // mint nft with id 1
-        quantum_leap.mint(1);
+        post_quantum.mint(1);
     }
 
     #[test]
@@ -140,12 +140,12 @@ mod tests {
     fn test_closed_mint() {
         let admin: ContractAddress = 0x123.try_into().unwrap();
         let user: ContractAddress = 0x456.try_into().unwrap();
-        let quantum_leap = IQuantumLeapDispatcher {
+        let post_quantum = IPostQuantumDispatcher {
             contract_address: deploy(array![admin.into()])
         };
         set_contract_address(user);
         // mint nft with id 1
-        quantum_leap.mint(1);
+        post_quantum.mint(1);
     }
 
     #[test]
@@ -155,15 +155,15 @@ mod tests {
         let admin: ContractAddress = 0x123.try_into().unwrap();
         let user: ContractAddress = 0x456.try_into().unwrap();
         set_contract_address(admin);
-        let quantum_leap = IQuantumLeapDispatcher {
+        let post_quantum = IPostQuantumDispatcher {
             contract_address: deploy(array![admin.into()])
         };
-        quantum_leap.open();
+        post_quantum.open();
         set_contract_address(user);
 
         // mint nft with id 1
-        quantum_leap.mint(1);
+        post_quantum.mint(1);
         // same with 2 (should fail)
-        quantum_leap.mint(2);
+        post_quantum.mint(2);
     }
 }
