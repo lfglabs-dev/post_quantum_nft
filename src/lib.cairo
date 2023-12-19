@@ -1,3 +1,9 @@
+use openzeppelin::{
+    token::erc721::{ERC721Component::{ERC721Metadata, HasComponent}},
+    introspection::src5::SRC5Component,
+};
+use custom_uri::{main::custom_uri_component::InternalImpl, main::custom_uri_component};
+
 #[starknet::interface]
 trait IPostQuantum<TState> {
     fn mint(ref self: TState, id: u256);
@@ -5,11 +11,48 @@ trait IPostQuantum<TState> {
     fn close(ref self: TState);
 }
 
+#[starknet::interface]
+trait IERC721Metadata<TState> {
+    fn name(self: @TState) -> felt252;
+    fn symbol(self: @TState) -> felt252;
+    fn token_uri(self: @TState, tokenId: u256) -> Array<felt252>;
+    fn tokenURI(self: @TState, tokenId: u256) -> Array<felt252>;
+}
+
+#[starknet::embeddable]
+impl IERC721MetadataImpl<
+    TContractState,
+    +HasComponent<TContractState>,
+    +SRC5Component::HasComponent<TContractState>,
+    +custom_uri_component::HasComponent<TContractState>,
+    +Drop<TContractState>
+> of IERC721Metadata<TContractState> {
+    fn name(self: @TContractState) -> felt252 {
+        let component = HasComponent::get_component(self);
+        ERC721Metadata::name(component)
+    }
+
+    fn symbol(self: @TContractState) -> felt252 {
+        let component = HasComponent::get_component(self);
+        ERC721Metadata::symbol(component)
+    }
+
+    fn token_uri(self: @TContractState, tokenId: u256) -> Array<felt252> {
+        let component = custom_uri_component::HasComponent::get_component(self);
+        component.get_base_uri()
+    }
+
+    fn tokenURI(self: @TContractState, tokenId: u256) -> Array<felt252> {
+        self.token_uri(tokenId)
+    }
+}
+
 #[starknet::contract]
 mod PostQuantum {
     use post_quantum_nft::IPostQuantum;
     use starknet::ContractAddress;
     use starknet::{get_caller_address, get_contract_address, class_hash::ClassHash};
+    use custom_uri::{interface::IInternalCustomURI, main::custom_uri_component};
     use openzeppelin::{
         account, access::ownable::OwnableComponent,
         upgrades::{UpgradeableComponent, interface::IUpgradeable},
@@ -23,7 +66,7 @@ mod PostQuantum {
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
-
+    component!(path: custom_uri_component, storage: custom_uri, event: CustomUriEvent);
 
     // allow to check what interface is supported
     #[abi(embed_v0)]
@@ -36,12 +79,10 @@ mod PostQuantum {
     #[abi(embed_v0)]
     impl ERC721Impl = ERC721Component::ERC721Impl<ContractState>;
     #[abi(embed_v0)]
-    impl ERC721MetadataImpl = ERC721Component::ERC721MetadataImpl<ContractState>;
-    #[abi(embed_v0)]
     impl ERC721CamelOnlyImpl = ERC721Component::ERC721CamelOnlyImpl<ContractState>;
+    // allow to query name of nft collection
     #[abi(embed_v0)]
-    impl ERC721MetadataCamelOnlyImpl =
-        ERC721Component::ERC721MetadataCamelOnlyImpl<ContractState>;
+    impl IERC721MetadataImpl = super::IERC721MetadataImpl<ContractState>;
 
     // add an owner
     #[abi(embed_v0)]
@@ -62,6 +103,8 @@ mod PostQuantum {
         ownable: OwnableComponent::Storage,
         #[substorage(v0)]
         upgradeable: UpgradeableComponent::Storage,
+        #[substorage(v0)]
+        custom_uri: custom_uri_component::Storage,
     }
 
     #[event]
@@ -74,13 +117,16 @@ mod PostQuantum {
         #[flat]
         OwnableEvent: OwnableComponent::Event,
         #[flat]
-        UpgradeableEvent: UpgradeableComponent::Event
+        UpgradeableEvent: UpgradeableComponent::Event,
+        #[flat]
+        CustomUriEvent: custom_uri_component::Event
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, owner: ContractAddress) {
+    fn constructor(ref self: ContractState, owner: ContractAddress, token_uri_base: Span<felt252>) {
         self.ownable.initializer(owner);
         self.erc721.initializer('Post Quantum', 'PQ');
+        self.custom_uri.set_base_uri(token_uri_base);
     }
 
     #[external(v0)]
