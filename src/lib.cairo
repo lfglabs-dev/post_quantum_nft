@@ -9,9 +9,10 @@ trait IPostQuantum<TState> {
 mod PostQuantum {
     use post_quantum_nft::IPostQuantum;
     use starknet::ContractAddress;
-    use starknet::{get_caller_address, get_contract_address};
+    use starknet::{get_caller_address, get_contract_address, class_hash::ClassHash};
     use openzeppelin::{
         account, access::ownable::OwnableComponent,
+        upgrades::{UpgradeableComponent, interface::IUpgradeable},
         token::erc721::{
             ERC721Component, erc721::ERC721Component::InternalTrait as ERC721InternalTrait
         },
@@ -21,6 +22,7 @@ mod PostQuantum {
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+    component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
 
 
     // allow to check what interface is supported
@@ -45,6 +47,8 @@ mod PostQuantum {
     #[abi(embed_v0)]
     impl OwnableImpl = OwnableComponent::OwnableImpl<ContractState>;
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
+    // make it upgradable
+    impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
     #[storage]
     struct Storage {
@@ -56,6 +60,8 @@ mod PostQuantum {
         erc721: ERC721Component::Storage,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
+        #[substorage(v0)]
+        upgradeable: UpgradeableComponent::Storage,
     }
 
     #[event]
@@ -67,12 +73,22 @@ mod PostQuantum {
         ERC721Event: ERC721Component::Event,
         #[flat]
         OwnableEvent: OwnableComponent::Event,
+        #[flat]
+        UpgradeableEvent: UpgradeableComponent::Event
     }
 
     #[constructor]
     fn constructor(ref self: ContractState, owner: ContractAddress) {
         self.ownable.initializer(owner);
         self.erc721.initializer('Post Quantum', 'PQ');
+    }
+
+    #[external(v0)]
+    impl UpgradeableImpl of IUpgradeable<ContractState> {
+        fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+            self.ownable.assert_only_owner();
+            self.upgradeable._upgrade(new_class_hash);
+        }
     }
 
     #[external(v0)]
